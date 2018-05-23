@@ -8,14 +8,18 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Mat;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
 
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Size;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SurfaceView;
@@ -34,6 +38,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     private CameraBridgeViewBase mOpenCvCameraView;
     private boolean              mIsJavaCamera = true;
     private MenuItem             mItemSwitchCamera = null;
+    private CascadeClassifier faceDetector;
+    private CascadeClassifier eyesDetector;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -49,6 +55,10 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
                     super.onManagerConnected(status);
                 } break;
             }
+
+            faceDetector = new CascadeClassifier(initAssetFile("haarcascade_frontalface_default.xml"));
+            eyesDetector = new CascadeClassifier(initAssetFile("haarcascade_eye.xml"));
+
         }
     };
 
@@ -70,6 +80,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
 
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+
     }
 
     @Override
@@ -115,13 +127,41 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         return col;
         */
 
-        Mat gray = inputFrame.gray();
         Mat col  = inputFrame.rgba();
+        Mat gray = inputFrame.gray();
 
         Mat tmp = gray.clone();
         Imgproc.Canny(gray, tmp, 80, 100);
         Imgproc.cvtColor(tmp, col, Imgproc.COLOR_GRAY2RGBA, 4);
 
+        //Reference: https://docs.opencv.org/java/2.4.9/org/opencv/objdetect/CascadeClassifier.html
+
+        MatOfRect faces = new MatOfRect();
+        MatOfRect eyes = new MatOfRect();
+        int eyesSize = 0;
+        faceDetector.detectMultiScale(gray, faces);
+
+        for(Rect rect : faces.toArray()){
+            Imgproc.rectangle(col, new Point(rect.x, rect.y),
+                    new Point(rect.x + rect.width, rect.y + rect.height),
+                    new Scalar(0, 255, 0));
+
+            eyesDetector.detectMultiScale(gray, eyes);
+            for(Rect rect1 : eyes.toArray()){
+                Imgproc.rectangle(col, new Point(rect1.x, rect1.y),
+                        new Point(rect1.x + rect1.width, rect1.y + rect1.height),
+                        new Scalar(0, 0, 255));
+                eyesSize = rect1.height;
+            }
+
+            int noseSize = rect.width/7;
+            int nosex = rect.x + (rect.width / 2);
+            int nosey = rect.y + (rect.height / 2) + eyesSize;
+            Imgproc.circle(col, new Point(nosex, nosey),
+                    noseSize,
+                    new Scalar(255, 0, 0),
+                    -noseSize);
+        }
         return col;
     }
 
