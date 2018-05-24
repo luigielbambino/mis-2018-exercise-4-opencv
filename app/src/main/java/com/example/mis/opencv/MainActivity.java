@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import static org.opencv.objdetect.Objdetect.CASCADE_SCALE_IMAGE;
+
 public class MainActivity extends Activity implements CvCameraViewListener2 {
     private static final String TAG = "OCVSample::Activity";
 
@@ -55,10 +57,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
                     super.onManagerConnected(status);
                 } break;
             }
-
             faceDetector = new CascadeClassifier(initAssetFile("haarcascade_frontalface_default.xml"));
             eyesDetector = new CascadeClassifier(initAssetFile("haarcascade_eye.xml"));
-
         }
     };
 
@@ -119,48 +119,44 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
 
-        //return inputFrame.rgba();
-        /*
-        Mat col  = inputFrame.rgba();
-        Rect foo = new Rect(new Point(100,100), new Point(200,200));
-        Imgproc.rectangle(col, foo.tl(), foo.br(), new Scalar(0, 0, 255), 3);
-        return col;
-        */
-
-        Mat col  = inputFrame.rgba();
+        Mat col = inputFrame.rgba();
         Mat gray = inputFrame.gray();
 
-        Mat tmp = gray.clone();
-        Imgproc.Canny(gray, tmp, 80, 100);
-        Imgproc.cvtColor(tmp, col, Imgproc.COLOR_GRAY2RGBA, 4);
+        int frameWidth = col.width();
+        int frameHeight = col.height();
 
         //Reference: https://docs.opencv.org/java/2.4.9/org/opencv/objdetect/CascadeClassifier.html
-
         MatOfRect faces = new MatOfRect();
         MatOfRect eyes = new MatOfRect();
         int eyesSize = 0;
-        faceDetector.detectMultiScale(gray, faces);
 
-        for(Rect rect : faces.toArray()){
-            Imgproc.rectangle(col, new Point(rect.x, rect.y),
-                    new Point(rect.x + rect.width, rect.y + rect.height),
-                    new Scalar(0, 255, 0));
+        faceDetector.detectMultiScale(gray, faces, 1.3, 5, 2, new org.opencv.core.Size(40, 40), new org.opencv.core.Size(frameWidth, frameHeight));
 
-            eyesDetector.detectMultiScale(gray, eyes);
-            for(Rect rect1 : eyes.toArray()){
-                Imgproc.rectangle(col, new Point(rect1.x, rect1.y),
-                        new Point(rect1.x + rect1.width, rect1.y + rect1.height),
-                        new Scalar(0, 0, 255));
-                eyesSize = rect1.height;
+        for(Rect rectf : faces.toArray()){
+            /* Draw rectangles around the faces
+            Imgproc.rectangle(col, new Point(rectf.x, rectf.y),
+                    new Point(rectf.x + rectf.width, rectf.y + rectf.height),
+                    new Scalar(0, 255, 0));*/
+            eyesDetector.detectMultiScale(gray, eyes, 1.2, 5, 2, new org.opencv.core.Size(20, 20), new org.opencv.core.Size(frameWidth, frameHeight));
+            for(Rect recte : eyes.toArray()){
+
+                /* Draw rectangles around the eyes
+                 *Imgproc.rectangle(col, new Point(recte.x, recte.y),
+                        new Point(recte.x + recte.width, recte.y + recte.height),
+                        new Scalar(0, 0, 255));*/
+                eyesSize = recte.height;
             }
 
-            int noseSize = rect.width/7;
-            int nosex = rect.x + (rect.width / 2);
-            int nosey = rect.y + (rect.height / 2) + eyesSize;
-            Imgproc.circle(col, new Point(nosex, nosey),
-                    noseSize,
-                    new Scalar(255, 0, 0),
-                    -noseSize);
+            if(eyes.toArray().length >= 1){
+                int noseSize = rectf.width/7;
+                int nosex = rectf.x + (rectf.width / 2);
+                int nosey = rectf.y + (rectf.height / 2) + (eyesSize/2);
+                Imgproc.circle(col, new Point(nosex, nosey),
+                        noseSize,
+                        new Scalar(255, 0, 0),
+                        -noseSize);
+            }
+
         }
         return col;
     }
